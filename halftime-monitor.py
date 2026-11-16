@@ -2,42 +2,52 @@ from nba_api.live.nba.endpoints import scoreboard
 from win11toast import toast
 import time
 
-headers = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/136.0.0.0 Safari/537.36"
-    ),
-    "Referer": "https://www.nba.com/",
-    "Origin": "https://www.nba.com",
-}
 
-def getGameById(id):
-    games = scoreboard.ScoreBoard(headers=headers).get_dict()
-    for game in games["scoreboard"]["games"]:
+def getGamesById(id):
+    games_dict = scoreboard.ScoreBoard().get_dict()
+    games = []
+    for game in games_dict["scoreboard"]["games"]:
         if game["gameId"] == id:
-            return game
+            games.append(game)
+    return games
 
-games = scoreboard.ScoreBoard(headers=headers)
 
+games = scoreboard.ScoreBoard()
 games_dict = games.get_dict()
-print(games.get_json())
-print("Pick the game to monitor: ")
-for i,game in enumerate(games_dict["scoreboard"]["games"]):
-    print(f"[{i}]: {game["homeTeam"]["teamName"]} vs {game["awayTeam"]["teamName"]} ")
+print("Pick the games to monitor, separated by commas: ")
+for i, game in enumerate(games_dict["scoreboard"]["games"]):
+    print(f"[{i}]: {game['homeTeam']['teamName']} vs {game['awayTeam']['teamName']} ")
 
-game_idx = int(input("Your game to monitor: "))
+games_idx = [int(x) for x in input("Your games to monitor: ").split(",")]
 
-game_id = games_dict["scoreboard"]["games"][game_idx]["gameId"]
+games_id = [
+    games_dict["scoreboard"]["games"][game_idx]["gameId"] for game_idx in games_idx
+]
 
-game = getGameById(game_id)
-period = game["period"]
+games = getGamesById(games_id)
+periods = [game["period"] if "period" in game else -1 for game in games]
 while True:
-    games = scoreboard.ScoreBoard(headers=headers)
-    period_new = getGameById(game_id)["period"]
-    if period == 2 and period_new == 3:
-        toast("Halftime is done!")
-    
-    period = period_new
-    time.sleep(5)
-    
+    games = scoreboard.ScoreBoard()
+    periods_new = []
+    for i, period in enumerate(periods):
+        periods_new = [
+            g["period"] if "period" in g else -1 for g in getGamesById(games_id)
+        ]
+        if period == 2 and periods_new[i] == 3:
+            toast(
+                "Halftime is done for game",
+                games_dict["scoreboard"]["games"][i]["homeTeam"]["teamName"],
+                "vs",
+                games_dict["scoreboard"]["games"][i]["awayTeam"]["teamName"],
+                "!",
+            
+            )
+        if period == -1 and periods_new[i] != -1:
+            toast(
+                "Tracked game has started!",
+                games_dict["scoreboard"]["games"][i]["homeTeam"]["teamName"],
+                "vs",
+                games_dict["scoreboard"]["games"][i]["awayTeam"]["teamName"],
+                  )
+        periods = periods_new
+    time.sleep(20)
